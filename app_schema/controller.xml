@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?> 
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:ext="http://www.liquibase.org/xml/ns/dbchangelog-ext"
+    xmlns:pro="http://www.liquibase.org/xml/ns/pro"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd
+        http://www.liquibase.org/xml/ns/dbchangelog-ext http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-ext.xsd
+        http://www.liquibase.org/xml/ns/pro http://www.liquibase.org/xml/ns/pro/liquibase-pro-latest.xsd">
+
+  <!-- change app_schema to your schema name -->
+  <includeAll file="app_schema/tables"/>
+
+  <!-- <includeAll path="sc_core/tables/" />  -->
+  <!-- <includeAll path="sc_core/views/" /> -->
+  <!-- <includeAll path="sc_core/type/" />  -->
+  <!-- <includeAll path="sc_core/type_body/" /> -->
+  <!-- <includeAll path="sc_core/triggers/" /> -->
+  <!-- <includeAll path="sc_core/package_spec/"/> -->
+  <!-- <includeAll path="sc_core/package_body/"/> -->
+  <!-- <includeAll path="sc_core/constraints/"/> -->
+  <!-- <includeAll path="sc_core/synonyms/"/> -->
+  <!-- <include file="sc_core/data/controller.xml"/> -->
+
+</databaseChangeLog>
