@@ -64,7 +64,7 @@ Liquibase commands provides an on-demand way to manage database changes. Liquiba
 
 >`liquibase [global argument] [command] [command attribute]`
 
->Command-line arguments entered using the CLI will always overrid the properties stored in the Liquibase properties file.
+>Command-line arguments entered using the CLI will always override the properties stored in the Liquibase properties file.
 
 ## Command values
 There are two ways a command value can be assigned:
@@ -195,7 +195,7 @@ It can be set in the properties file or specified in the command line.
     liquibase --help
     liquibase <command name> --help
 
-## Update / Update-sql
+## Update / Update-sql / update-to-tag
 The Liquibase update command executes undeployed changes to a target database specified in the changelog.  When database changes are deployed for the first time in a new Liquibase project, the two Liquibase tracking tables are created in the database.
 
 Since the update command directly changes the database schema, Liquibase provides a corresponding update-sql command. The **update-sql** command is considered a helper command that provides users the ability to inspect the SQL Liquibase that will run prior to using the update command. The **update-sql** command output is used to inspect the raw SQL to check for problem areas so users can correct identified issues before running the update command. Teams also use the command to track what Liquibase will run on the database.
@@ -203,6 +203,14 @@ Since the update command directly changes the database schema, Liquibase provide
 `liquibase --changelog-file=yourchangelog.xml update-sql`
 
 `liquibase --changelog-file=yourchangelog.xml update`
+
+The `update-to-tag` command will deploy changes starting with the first changeset at the top of the changelog file until the specified tag is reached.
+
+> The update-to-tag command will deploy changes only when you have the tagDatabase Change Type in your changelog file. The tagDatabase Change Type is not supported for formatted SQL changelogs. 
+
+> You cannot use the update-to-tag command with a reference to a tag created in the DATABASECHANGELOG table using the tag command.
+
+`liquibase --changelog-file=dbchangelog.xml update-to-tag version1`
 
 ## Database Status Commands - Status / History
 >**history** will list deployed changesets.This is useful to inspect a group of changes to makre sure they have been applied to the database. It just requires the database URL, username and password.
@@ -288,6 +296,19 @@ Examples:
     -- rollback delete from example1 where id='1'
     -- rollback delete from example1 where id='2'
 
+Liquibase can automatically generate a rollback statement when it can determine how the rollback should be constructed.
+
+For example, the rollback of a CREATE TABLE would be a DROP TABLE. If your changelog only contains statements that fit into this category, your rollback commands will be generated automatically. You do not need to add anything to your changelogs or Liquibase configuration to enable auto-generated rollbacks.
+
+### Rolling Back of SQL Changelogs
+
+    -- liquibase formatted sql
+
+    -- changeset lbuser:20200908
+    insert into CustomerDetails values ('A','Customer NumberOne', 'Austin')
+    insert into CustomerDetails values ('A','Customer NumberTwo', 'Dallas')
+    -- rollback delete from CustomerDetails where id='A'
+
 ## Diff Commands
 
 Then can be used to:
@@ -334,6 +355,118 @@ Examples:
 - `liquibase --changelog-file=newgeneratedchangelog.xml generate-changelog`
 - `liquibase --changelog-file=newgeneratedchangelog.yourdbtype.sql generate-changelog` - to create a SQL changelog file, add the database short name attribute when specifying the changelog file - `oracle, postgresql, db2, and H2`.
 
+## tag for Setting Tags
+
+A tag is like a bookmark. It designates a point in the changelog file or a row in the DATABASECHANGELOG table that indicates the database state, version, release, or other identifying information. 
+
+It is a best practice to add tags to your changelogs before running Liquibase commands against your database.
+
+Use cases:
+
+- To mark the current state of your database, its version, or a numbered release with the tag command to roll back changes in the future. 
+- To use the `rollback` command to sequentially undo all changes that were made to the database after the specified tag. 
+- To use the `update-to-tag` command to sequentially apply all changesets from your changelog up to the point indicated by the tag. 
+- To separate the flow of changes based on versions and releases for database migrations.
+- Manage a series of deployments in multiple databases and track their history.
+
+How to use it:
+
+- Use the `tagDatabase` Change Type to tag your current database state, release, or version, and then deploy new changesets to that tag, or roll back changesets applied after that tag. The tagDatabase Change Type is useful to mark the beginning of a release. 
+
+        <changeSet  author="liquibase"  id="1">  
+            <tagDatabase  tag="version1"/>  
+        </changeSet>
+
+-  Use the tag command to mark the end of a release. The tag command will mark the current database state so you can roll back changes in the future. After setting the tag, use the `rollback<tag>` command to roll back all changes under the tag.
+
+`liquibase tag version1`
+
+# Troubleshooting
+
+## Common mistakes
+- incorrectly structured XML/YAML/JSON/formatted SQL
+- references to missing files
+- duplicated id/author/file combinations
+- checksum errors
+- missing or incorrect changeset attributes for your database platform
+- failures in top-level preconditions
+
+> If the Liquibase update command encounters an error in a changelog, it will **stop processing** which will leave you with a partial update. It is a best practice to verify that a changelog is valid before running an update. 
+
+## Validate (command)
+
+This command checks and identifies possible errors in a changelog that can cause the update command to fail. You can avoid a partial updates. If you use nestest changelogs, Liquibase will check all changelogs in the hierarchy for changesets to validate. But, it does not verify that the SQL syntax is correct. 
+
+`liquibase --changelog-file=dbchangelog.xml validate`
+
+## Rollback Test Cycle
+1. Deploying all changes to the database and validating that they were deployed.
+2. Rolling back all changes to the database, validating that all changes were undone, and the database was brought back to the previous state.
+3. Redeploying all changes to the database. This step is required to verify that the rollback did not miss any changes that would impact a future development. 
+
+## The **update-testing-rollback** Command
+The **update-testing-rollback** is typically used to test rollback functionality when deploying changesets in your changelog sequentially. 
+
+> The command tests your rollback by deploying all pending changesets to the database, executing a rollback sequentially in reverse order for the changesets that were deployed, and then running the update again to deploy all changesets to the database. 
+
+> Run **update-testing-rollback** only when all pending changelogs are ready to be deployed as you cannot specify changests to exclude. 
+
+`liquibase --changelog-file=dbchangelog.sql --log-level=info update-testing-rollback`
+
+## The **future-rollback-sql** Command
+It is a best practice to inspect the SQL Liquibase would run before doing a rollback so that you can review the changes that would be made to the database. 
+
+The **future-rollback-sql** command produces the raw SQL Liquibase would use to revert changes associated with undeployed changesets. It does not deploy any changes to the database.
+
+The future-rollback-sql command is also useful when auditors need to verify that all database changes have a rollback.
+
+Notice that the rollback SQL removes the changesets from the DATABASECHANGELOG table along with undoing the database changes. This allows you to redeploy the changesets after executing a rollback.
+
+`liquibase --changelog-file=dbchangelog.sql --output-file=futurerollback.sql future-rollback-sql`
+
+## list-locks Command
+The list-locks command reads the DATABASECHANGELOGLOCK table and returns the hostname, IP address, and the timestamp the Liquibase lock record was added. The command determines the connections to the DATABASECHANGELOGLOCK table based on the database URL.
+
+When an error occurs during a database deployment, list-locks is a good command to start with when troubleshooting the situation. The error might indicate that there is a lock record in the DATABASECHANGELOGLOCK table that prevents Liquibase from applying changes to the specified database.
+
+`liquibase --changelog-file=dbchangelog.xml list-locks`
+
+## release-locks Command
+The **release-locks** command removes the specific Liquibase lock record from the DATABASECHANGELOGLOCK table in the database. Manually updating the DATABASECHANGELOGLOCK table is not a recommended procedure. Using the release-locks command is the most appropriate solution.
+
+`liquibase --changelog-file=dbchangelog.xml release-locks`
+
+## clear-checksums Command
+
+The Liquibase clear-checksums command clears all checksums and nullifies the MD5Sum column of the DATABASECHANGELOG table so the checksums will be re-computed the next time the Liquibase update command is run.
+
+The checksum in the DATABASECHANGELOG table is a combination of the MD5Sum of the file, the author, and the id of a changeset. It is meant to make sure that the changesets in the log file are the same as what was applied to the database.
+
+`liquibase  clear-checksums`
+
+> There are a number of reasons for clearing the checksums on the DATABASECHANGELOG, but the command should be used as a last resort since it clears all checksums on every change that has been made to the database.
+
+Alternatives:
+
+- Adding a valid-checksum attribute to the changeset that is having problems deploying.
+- Manually removing the entry or entries in the DATABASECHANGELOG table and cleaning up the database that those entries represent. This will remove the changeset with the checksum error to run on the next update.
+
+## mark-next-changeset-ran Deploying Manual Changes
+
+There are times when there is a small time window to fix a PROD database. In that case, you may test a fix in STAGE, and once validated, manually deploy to PROD with the same change applied to the DEV and TEST environments.
+
+You can add the change to your changelog and update DEV and TEST without any problems. However, the update should not be applied to the STAGE and PROD environments. In fact, the update is likely to fail in STAGE and PROD because of an "object already exists" error.
+
+In this situation, you need to update the DATABASECHANGELOG table so that Liquibase does not try to apply the changeset to the databases where the changeset was manually applied.
+
+The mark-next-changeset-ran command marks the next changeset to be applied as executed by inserting a new row in the DATABASECHANGELOG table. You can think of it as a "fake deploy" operation.
+
+The mark-next-changeset-ran-sql command is used to inspect the raw SQL before running the mark-next-changeset-ran command. It is a best practice to verify that the correct changeset will be marked as executed before running the mark-next-changeset-ran command.
+
+`liquibase --changelog-file=dbchangelog.xml mark-next-changeset-ran-sql`
+
+`liquibase --changelog-file=dbchangelog.xml mark-next-changeset-ran`
+
 # Standard Developer Workflow
 
 - Adding a changeset(s) to the changelog.
@@ -359,6 +492,13 @@ Data used as part of building and testing the application should be managed with
 3. Download JDBC libraries when necessary and place it into `liquibase/internal/lib` folder.
 4. Prepare the master.xml file to make him including single changelogs and entire folders. 
 
+# Useful Commands
+[Liquibase Commands](https://docs.liquibase.com/parameters/home.html)
+
+`liquibase --defaults-file=liquibase_config/dev.liquibase.properties status`
+
+`liquibase --defaults-file=liquibase_config/dev.liquibase.properties --changelog-file=practice/dbchangelog.xml status --verbose`
+
 # Other stuff
     set ddl storage off
     set ddl tablespace off
@@ -374,3 +514,12 @@ Data used as part of building and testing the application should be managed with
 
 1. Run `./db_setup/install/1_install_system.sql` from `SYS` user.
 2. Run `./db_setup/install/2_install_logger.sql` from `LOGGER` user.
+3. Run Liquibase command `TODO` to execute changests. 
+
+## Adding another schema
+1. Copy starter folder. Ensure all the schema name being added is correct everywhere. See the changeset headers also!
+2. Add 2 changelogs to master.xml.
+3. Add DROP statement to `/db_setup/admin/drop.sql`
+
+# TODO
+1. Explain how to introduce Liquibase in existing project.

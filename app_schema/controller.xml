@@ -10,7 +10,8 @@
         http://www.liquibase.org/xml/ns/pro http://www.liquibase.org/xml/ns/pro/liquibase-pro-latest.xsd">
 
   <!-- change app_schema to your schema name -->
-  <includeAll file="app_schema/tables"/>
+  <includeAll path="app_schema/tables"/>
+  <includeAll path="app_schema/synonyms"/>
 
   <!-- <includeAll path="sc_core/tables/" />  -->
   <!-- <includeAll path="sc_core/views/" /> -->
