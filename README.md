@@ -20,7 +20,7 @@
 
 >Liquibase utilizes **Commands** and **Change Types** to run any changes in the database.
 
->Liquibase **Changelogs, Changesets and Change Type Objects** can be written in **SQL, XML, SQL and JSON**. In XML, YAML or JSON, the same schema changes are modeled as Liquibase Change Types. SQL and non-SQL formats can be mixed inside one project.
+>Liquibase **Changelogs, Changesets and Change Type Objects** can be written in **SQL, XML, YAML and JSON**. In XML, YAML or JSON, the same schema changes are modeled as Liquibase Change Types. SQL and non-SQL formats can be mixed inside one project.
 
 >Change Types describe a type of change, or action, to be executed against a database. They are easily identifiable since the Change Type description typically begins with the category of action.
 
@@ -159,6 +159,138 @@ Or for other example:
 
 `<includeAll file="com/example/db/changelog/releases"/>`
 
+# Components of Changelog
+
+## List of compoments
+- global preconditions (changelog level)
+- changelog headers
+- changesets
+- changeset attributes
+
+## Global Preconditions
+Preconditions control the execution of an update based on the state of the database. When preconditions are used at the **changelog level**, they are known as **global preconditions**. They are checked in the beginning when executing a changelog and apply to all changesets in the current changelog including its sub-changelogs. 
+
+The following will run if it is executed against an Oracle database and the user executing the script is "SYSTEM".
+
+    <preConditions>
+        <dbms  type="oracle"  />
+        <runningAs  username="SYSTEM"  />
+    </preConditions>
+
+## Changeset Attributes
+Except attributes like **id, author and changelog file path**, other changeset attributes can be included: **runOnChange, runAlways, contexts, labels and preconditions**.
+
+> [Check documentation for more about changeset attributes.](https://docs.liquibase.com/concepts/changelogs/attributes/home.html?Highlight=attributes)
+
+## Change Types
+They are database independent, can execute the same changelog for different database vendors, and can provide automatic rollback of changes. Note that not all databases support all Change Types and their rollback action. 
+
+> [Check the documentation for more](https://docs.liquibase.com/change-types/home.html)
+
+
+## Labels
+
+Labels are strings that can be added to changesets to provide users the ability to group and classify changesets with the use of label expressions. They provide users the ability to apply complex filtering to their deployment at runtime. During Liquibase execution time, the label expression acts as a filter to control precisely which changesets will be executed. 
+
+But, there are also some risks when using labels:
+- Labels can introduce data change variability into the pipeline by excluding certain changesets.
+- Greater complexity at runtime to determine which label expression should be used to perform the deployment. 
+
+### Characteristics of Labels
+- They consist of a string or a list of strings.
+- Labels use commas to separate labels in a list.
+- Labels should enumerate or describe the changeset.
+- Labels are NOT case-sensitive. 
+- Labels should not be used as a way to mark ticket issues for tracking or reporting purposes. Use changeset comments instead. 
+
+
+### Label Expressions
+Label expressions contain the following syntax:
+- AND
+- OR (a comma will work the same as an OR expression)
+- ! (not)
+- () (parentheses that are used for grouping)
+
+Examples:
+
+`--labels="!v.0.1"` - deploy changesets without label v.0.1
+
+`--labels="v.0.1, v.1.0 and v.1.1"` - equivalent to "(v.0.1) OR (v.1.0 AND v.1.1)"
+
+`--labels="v.1.0 AND v.1.1"`
+
+`--labels="v.1.0 OR v.1.1"`
+
+    --liquibase formatted sql
+    --changeset your.name:101 labels:PETS-v1.1
+
+`liquibase --changelog-file=yourchangelog.xml --labels="PETS-v1.1" update`
+
+## Contexts
+
+Contexts are added to changesets to control which changesets will be executed in a particular migration run. They are typically used to control changesets to apply to a specified database environment. For example, you may use them to indicate which changesets should run in a DEV, TEST or QA environment. 
+
+Contexts may albo be applied to the include and includeAll tags. Files referenced by the include tag will follow the same context logic as contexts specified on individual changesets. 
+
+`--contexts="test"`
+
+`--contexts=dev,test`
+
+    --liquibase formatted sql
+    --changeset your.name:102 context:DEV
+
+`liquibase --changelog-file=CustomerChangelog.xml --contexts="Customer_A" update`
+
+### Contexts or Labels
+> If you want to describe/tag the environment and have the changeset author decide which environments they should run in, consider using contexts. 
+
+> If complex logic is determined at runtime, you probably want labels.
+
+> There is no exact method for selecting contexts or labels and in fact, you can use both. 
+
+## Preconditions
+Preconditions are changelog or changeset tags that control the execution of an update based on the state of the database. Preconditions allow users to include error handling in their changelogs such as:
+- Throwing failures and warnings.
+- Skipping changesets.
+
+Several uses of preconditions include:
+- Document changelog assumptions from the changelog author specified by a particular username.
+- Enforce changelog assumptions are not violated - fail if a table does not exist.
+- Perform data checks before running unrecoverable changes such as preventing dropTable if data exists.
+
+`--precondition-sql-check expectedResult:0 SELECT count(1) FROM public.customer where locked = 'true'`
+
+### Handling Failures and Errors
+Liquibase distinguishes between preconditions that execute but fail based on specified criteria versus preconditions that throw exceptions. 
+
+For example:
+- Liquibase will **fail** if a select count(*) on a table returns a value 3 if the expected count was 1.
+- Liquibase will **error** if a select count(*) on a table throws an exception because the table does not exist. 
+
+`onFail`, `onError`
+
+> Formatted SQL only supports the sqlCheck precondition
+
+## Changesets to Run Repeatedly Using Liquibase
+`runOnChange:true` - for stored logic like functions, procedures, view, etc.
+
+`runAlways:true` - if you have a grant statement that needs to run with every deployment, you can use the runAlways attribute
+
+`runOrder` - attribute overrides the order in the changelog and allows the changeset to be run either first, or last, in the deployment. The runOrder attribute is frequently used in combination with runAlways changesets for SQL that need to be run at the beginning or end of every deployment. **The runOrder attribute is not supported for formatted SQL.**
+
+## Comments
+Why is it a best practice to use comments?
+- To document the database changes for future reference.
+- To explain complex database changes to other developers.
+- To **reference a JIRA story or feature request** which triggered the change in the database or tie together database changes with a service request management tool.
+
+
+        --liquibase formatted sql
+        --changeset nvoxland:DB-1011
+        --comment New table: customer
+
+
+
 # Changeset Attributes
 >The author and id are required since more than one person could use the same id value.
 
@@ -228,6 +360,16 @@ Options:
 
 >Clear the locks when Liquibase did not exit cleanly
 `liquibase releaseLocks`, which runs `UPDATE DATABASECHANGELOGLOCK SET LOCKED=0`
+
+## Context Tag
+The Liquibase context tag can be added to changesets to control the environments where the changes will be executed. For example, test data changesets can be marked with a "test" or "dev-test" context to prevent the data from being run in production or other non-test environments. 
+
+This parameter will act as a filter so that only changesets marked for the particular context will be migrated. 
+
+    <changeSet id="2" author="bob" context="test"></changeSet>
+
+## Liquibase DBMS Preconditon
+Liquibase also has a DBMS precondition that determines if changesets should be executed based on the **database type** specified. Using a precondition will prevent changes from running in any database types not specified. 
 
 ## Rollback
 Rollback commands **sequentially undo** changes that have been deployed to a specified point such as a date, number of changes or by tag name.
@@ -381,6 +523,54 @@ How to use it:
 
 `liquibase tag version1`
 
+# CI/CD Process and Liquibase
+
+## DevOps Six Principles
+
+1. **Continous Development** - the project is defined and developers write application code which is maintained in a source code control management tool (SCM).
+2. **Continous Integration** - automated application build phase triggered when developers merge code changes into a central source code repository.
+3. **Continous Testing** - the application is tested for issues.
+4. **Continous Deployment** - the application is deployed to the production servers.
+5. **Continous Monitoring** - the application's performance and its vitals are monitored.
+6. **Continous Feedback** - informs next steps and provides actionable information.
+
+## How Liquibase Fits Into an Overall CI/CD Process
+
+1. Push your changes to the repository.
+2. Create a pull request against the DEV branch. 
+3. Merge the feature branch with the DEV branch.
+4. CI/CD implementation configuration on the DEV server triggers Liquibase for database updates. 
+5. Liquibase automatically executes any new changelog files and knows which scripts have already run. 
+
+## Continous Integration
+> Source -> Build -> Test
+
+## Continous Deployment
+This is a process that automates the complete workflow starting with a developer making changes to the source code which triggers a process that takes those changes through continous integration and continous delivery.
+
+If the code is correct, stable and deployable, the code is automatically deployed to production as soon as specified conditions are met. Also, CD enables developers to fully automate every code change into production. 
+
+# Database Testing
+
+## Functional / End-to-End Testing
+It's a software testing method where tests are written to mimic what end-user will do with the application. It involves testing the application workflow from beginning to end.
+
+They are good at capturing a different set of issues that might not be caught with integration or unit testing. Also, these tests can be expensive, they require more time to write and execute. But, they do not point to the root cause of the failure so investigating an issue takes longer.
+
+## Integration Testing
+This testing method typically focuses on a small numer of modules and tests their interactions when combined. Integration tests are meant to ensure that the units you have written are able to work together. 
+
+They are small and focused and while they take longer to run than unit tests, they should also be relatively quick. They are more expensive than unit tests because they can take longer to write an execute the test. 
+
+## Unit Testing
+It allows testing of smallest, atomic, programmable part of a database object such as class or method. 
+
+UTs validate functionality in isolation and without any external system interaction. They do not require additional setup, and take less time to write and execute. 
+
+Units should be tested in isolation and independent of other units. This is typically achieved by mocking the dependencies. In the case of Liquibase, this means that a database connection is not required. 
+
+When a unit test fails, it immediately highlights the root cause of the issue. 
+
 # Troubleshooting
 
 ## Common mistakes
@@ -514,7 +704,7 @@ Data used as part of building and testing the application should be managed with
 
 1. Run `./db_setup/install/1_install_system.sql` from `SYS` user.
 2. Run `./db_setup/install/2_install_logger.sql` from `LOGGER` user.
-3. Run Liquibase command `TODO` to execute changests. 
+3. Run Liquibase command `liquibase --defaults-file=liquibase_config/dev.liquibase.properties --changelog-file=master.xml update-sql` to execute changests. 
 
 ## Adding another schema
 1. Copy starter folder. Ensure all the schema name being added is correct everywhere. See the changeset headers also!
@@ -523,3 +713,20 @@ Data used as part of building and testing the application should be managed with
 
 # TODO
 1. Explain how to introduce Liquibase in existing project.
+
+# Notes from SC
+When creating new users remember to:
+
+Create folder for that user in repo and controller.xml
+
+Create inside it after_install folder with create user scripts and grants, and seperate controler.xml/ Be sure that Liquibase_user can grant the grants you wish that user has
+If liquibase_user lacks grants add them the SUPER_USER ROLE with admin option , and add them to /admin/create_super_user_role.sql script
+
+Add user to /admin/drop.sql script
+
+Add created controllers to liqibase_master.xml , remember that paths in all controllers need to start from root of this repo
+
+Add synonyms to logger example can be found in /sc_core/synonyms/logger.sql
+
+`<include file="apex/sc/sc_core/apex_install.xml"/>`
+

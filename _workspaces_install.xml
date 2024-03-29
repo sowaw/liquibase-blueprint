@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog 
+  xmlns="http://www.liquibase.org/xml/ns/dbchangelog" 
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+  xmlns:n0="http://www.oracle.com/xml/ns/dbchangelog-ext" 
+  xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.6.xsd">
+  <changeSet author="lmaciuga" id="create_sc_workspace" failOnError="true">
+    <n0:runOracleScript objectName="w7464103705806254" ownerName="SC_CORE" sourceType="FILE">
+      <n0:source>
+        <![CDATA[apex/workspaces/sc/w7464103705806254.sql]]>
+      </n0:source>
+    </n0:runOracleScript>
+  </changeSet>
+  <changeSet author="lmaciuga" id="create_sc_internal_workspace" failOnError="true">
+    <n0:runOracleScript objectName="w8675426968838889" ownerName="SC_CORE" sourceType="FILE">
+      <n0:source>
+        <![CDATA[apex/workspaces/sc_internal/w8675426968838889.sql]]>
+      </n0:source>
+    </n0:runOracleScript>
+  </changeSet>
+</databaseChangeLog>
