@@ -289,7 +289,49 @@ Why is it a best practice to use comments?
         --changeset nvoxland:DB-1011
         --comment New table: customer
 
+## Reorganize Existing Changelogs
+When reorganizing existing changelogs, if the changelog filename or path changes, **Liquibase considers the changesets in the changelog to be new changesets and will try to rerun them.**
 
+- To maintain the existing filename associated with the changesets, add the **logicalFilePath** attribute to the changelogs.
+- To move a file, you can add the logicalFilePath attribute to the **database changelog** to tell Liquibase where it originally was located. This applies to all changesets. 
+- To move individual changesets to different files, you can set the logicalFilePath attribute on each changeset.
+- The logicalFilePath attribute should be specified **relative** to the classpath.
+- Run the **history** command to see the paths stored for existing changesets and use that value for the logicalFilePath.
+
+## Restart the Project Strategy
+1. Apply all changesets to all environments.
+2. Archive the existing changelogs.
+3. Restart with a new strategy. 
+
+## Improving Changelog Efficiency
+- If the update is taking longer than it should, check the Liquibase log to determine why. Running Liquibase with **log-level=INFO** of even **log-level=FINE** will give an additional output that can help you determine which changesets are slow. Once you know what is slowing down the update, try to alter just those changesets. 
+
+Potential Inefficiences
+- Obsolete **runAlways="true"** changesets.
+- Preconditions that are no longer needed.
+- Re-creation of indexes.
+
+## Consolidate Existing Changesets Example
+1. Create a new changeset using the same author and id as the original changeset.
+2. Add the **validCheckSum** attribute to the new changeset using the checksum associated with the original changeset.
+3. Delete the old changesets.
+
+        --changeset your.name:1 
+        --validCheckSum: 7:f24b25ba0fea451728ffbade634f791d
+
+        create table cart (
+                id int,
+                promo_code varchar(10),
+                abandoned boolean
+        );
+
+## Working with Multiple Schemas
+- The **defaultSchemaName** property speficies the default schema name to use for the database connection. This property is needed to deploy changes to a different schema than the user's default schema. 
+- If a SQL statement contains a prefixed schema name for objects, and there is a different value for that property, the object will be created in the prefixed schema.
+- The **liquibaseSchemaName** property can be used to ensure that the DATABASECHANGELOG tracking table will be created and managed from the value defined in this property.
+
+## Modifying Deployed Changesets
+It is important to be careful when modifying changeset metadata. Accidentally modifying the changeset body will result in a **new checksum**. Making modifications after deploying a changeset could result in checksum mismatch error. 
 
 # Changeset Attributes
 >The author and id are required since more than one person could use the same id value.
@@ -368,8 +410,14 @@ This parameter will act as a filter so that only changesets marked for the parti
 
     <changeSet id="2" author="bob" context="test"></changeSet>
 
+It is important to note that contexts can only be applied on changesets, or using the include or includeAll tags. Contexts cannot be applied globally at the top of the changelog file. 
+
 ## Liquibase DBMS Preconditon
 Liquibase also has a DBMS precondition that determines if changesets should be executed based on the **database type** specified. Using a precondition will prevent changes from running in any database types not specified. 
+
+Preconditions can be specified at the changelog level. Preconditions at the changelog level are applied to all changesets. 
+
+[Read more in documentation](https://docs.liquibase.com/concepts/changelogs/preconditions.html)
 
 ## Rollback
 Rollback commands **sequentially undo** changes that have been deployed to a specified point such as a date, number of changes or by tag name.
